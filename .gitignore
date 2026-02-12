@@ -19,6 +19,10 @@ build/
 .vscode/
 .idea/
 
+# Claude Code
+.claude/settings.local.json
+CLAUDE.md
+
 # OS
 Thumbs.db
 .DS_Store
