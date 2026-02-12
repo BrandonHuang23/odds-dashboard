@@ -14,11 +14,17 @@
 	let loading = false;
 	let error = '';
 
-	// Re-fetch games when sport changes
-	$: if ($selections.sport) {
-		loadGames($selections.sport);
-	} else {
-		games = [];
+	// Track sport separately so the reactive block only fires on sport changes,
+	// not on every selections update (e.g., game or market selection).
+	let lastSport = '';
+	$: currentSport = $selections.sport;
+	$: if (currentSport !== lastSport) {
+		lastSport = currentSport;
+		if (currentSport) {
+			loadGames(currentSport);
+		} else {
+			games = [];
+		}
 	}
 
 	async function loadGames(sport: string) {

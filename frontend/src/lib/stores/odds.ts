@@ -63,29 +63,39 @@ export function applySnapshot(msg: SnapshotMessage): void {
 /**
  * Apply an incremental update from the backend (merges into existing data).
  *
- * EDUCATIONAL: This mirrors the accumulative pattern on the backend.
- * We merge the update into our local state rather than replacing it.
+ * EDUCATIONAL: The backend sends a full snapshot for each updated sportsbook
+ * (via StateStore.get_snapshot), so we REPLACE each sportsbook's outcomes
+ * entirely rather than deep-merging keys.  This ensures that outcomes/books
+ * removed from the backend (e.g., suspended odds) are also removed on the
+ * frontend.  Sportsbooks NOT present in the message are left untouched.
  */
 export function applyUpdate(msg: UpdateMessage): void {
 	oddsData.update((current) => {
-		// Deep merge the odds data
 		const updatedOdds = { ...current.odds };
 
+		// The message contains the complete current state for every sportsbook
+		// included in msg.odds.  Replace each one wholesale.
 		for (const [sportsbook, outcomes] of Object.entries(msg.odds)) {
-			if (!updatedOdds[sportsbook]) {
-				updatedOdds[sportsbook] = {};
-			}
+			// Filter out any outcomes with null odds (suspended) just in case
+			const live: Record<string, OutcomeData> = {};
 			for (const [key, outcome] of Object.entries(outcomes)) {
-				if (outcome.odds === null) {
-					// Null odds = suspended, remove the outcome
-					delete updatedOdds[sportsbook][key];
-				} else {
-					updatedOdds[sportsbook][key] = outcome;
+				if (outcome.odds !== null) {
+					live[key] = outcome;
 				}
 			}
-			// Clean up empty sportsbooks
-			if (Object.keys(updatedOdds[sportsbook]).length === 0) {
+			if (Object.keys(live).length > 0) {
+				updatedOdds[sportsbook] = live;
+			} else {
 				delete updatedOdds[sportsbook];
+			}
+		}
+
+		// Remove sportsbooks that are no longer present in a full-game update.
+		// msg.odds is a full snapshot for this game/market, so any sportsbook
+		// absent from it has no data for this market anymore.
+		for (const book of Object.keys(updatedOdds)) {
+			if (!(book in msg.odds)) {
+				delete updatedOdds[book];
 			}
 		}
 
@@ -124,6 +134,25 @@ export interface OddsRow {
 	cells: Record<string, OutcomeData>;
 	/** Which sportsbook has the best odds in this row */
 	bestBook: string | null;
+	/** Groups paired outcomes (e.g. both sides of a spread) for visual grouping */
+	pairId: string;
+}
+
+/**
+ * Compute a pair identifier that groups complementary outcomes together.
+ * For spreads: both sides share the same absolute line value.
+ * For totals: over and under share the same line value.
+ * For moneyline: all outcomes share a single group.
+ */
+function computePairId(outcome: { outcome_name: string; outcome_line: string | null }): string {
+	const name = outcome.outcome_name?.toLowerCase() ?? '';
+	if (name === 'spread' && outcome.outcome_line) {
+		return `spread_${Math.abs(parseFloat(outcome.outcome_line))}`;
+	}
+	if (name === 'total' && outcome.outcome_line) {
+		return `total_${outcome.outcome_line}`;
+	}
+	return `other_${name}`;
 }
 
 export const oddsRows = derived(oddsData, ($odds): OddsRow[] => {
@@ -154,6 +183,7 @@ export const oddsRows = derived(oddsData, ($odds): OddsRow[] => {
 					target: outcome.outcome_target,
 					cells: {},
 					bestBook: null,
+					pairId: computePairId(outcome),
 				});
 			}
 
@@ -180,13 +210,22 @@ export const oddsRows = derived(oddsData, ($odds): OddsRow[] => {
 		row.bestBook = bestBook;
 	}
 
-	// Sort rows: by line (ascending), then over before under
+	// Sort rows: group by pair, then within each pair order logically
 	const rows = Array.from(rowMap.values());
 	rows.sort((a, b) => {
+		// First: group by pairId
+		if (a.pairId !== b.pairId) {
+			// For spread pairs, sort by absolute line (smallest spread first)
+			const absLineA = a.outcomeLine ? Math.abs(parseFloat(a.outcomeLine)) : 0;
+			const absLineB = b.outcomeLine ? Math.abs(parseFloat(b.outcomeLine)) : 0;
+			if (absLineA !== absLineB) return absLineA - absLineB;
+			return a.pairId.localeCompare(b.pairId);
+		}
+		// Within a pair: favorite (negative line) first for spreads
 		const lineA = a.outcomeLine ? parseFloat(a.outcomeLine) : 0;
 		const lineB = b.outcomeLine ? parseFloat(b.outcomeLine) : 0;
 		if (lineA !== lineB) return lineA - lineB;
-		// Over before Under
+		// Over before Under for totals
 		if (a.overUnder === 'O' && b.overUnder === 'U') return -1;
 		if (a.overUnder === 'U' && b.overUnder === 'O') return 1;
 		return a.label.localeCompare(b.label);

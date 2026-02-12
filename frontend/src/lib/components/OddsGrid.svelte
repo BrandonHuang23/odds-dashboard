@@ -67,8 +67,8 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each rows as row}
-						<tr>
+					{#each rows as row, i}
+						<tr class:pair-start={i > 0 && row.pairId !== rows[i - 1].pairId}>
 							<td class="row-label">{row.label}</td>
 							{#each books as book}
 								<OddsCell
@@ -144,6 +144,11 @@
 
 	tbody tr:last-child {
 		border-bottom: none;
+	}
+
+	/* Visual separator between different outcome pairs */
+	tbody tr.pair-start {
+		border-top: 3px solid var(--color-border);
 	}
 
 	tbody tr:hover {

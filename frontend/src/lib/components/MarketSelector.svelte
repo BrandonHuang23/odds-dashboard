@@ -13,11 +13,18 @@
 	let loading = false;
 	let error = '';
 
-	// Re-fetch markets when game changes
-	$: if ($selections.sport && $selections.game) {
-		loadMarkets($selections.sport, $selections.game.game_id);
-	} else {
-		markets = [];
+	// Track game_id separately so the reactive block only fires on game changes,
+	// not on every selections update (e.g., market tab click).
+	let lastGameId = '';
+	$: currentGameId = $selections.game?.game_id ?? '';
+	$: currentSport = $selections.sport;
+	$: if (currentGameId !== lastGameId) {
+		lastGameId = currentGameId;
+		if (currentSport && currentGameId) {
+			loadMarkets(currentSport, currentGameId);
+		} else {
+			markets = [];
+		}
 	}
 
 	async function loadMarkets(sport: string, gameId: string) {

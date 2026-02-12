@@ -7,12 +7,12 @@ export default defineConfig({
 		proxy: {
 			// Proxy REST API calls to FastAPI backend during development
 			'/api': {
-				target: 'http://localhost:8000',
+				target: 'http://127.0.0.1:8000',
 				changeOrigin: true,
 			},
 			// Proxy WebSocket connections to FastAPI backend
 			'/ws': {
-				target: 'ws://localhost:8000',
+				target: 'ws://127.0.0.1:8000',
 				ws: true,
 			},
 		},

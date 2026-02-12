@@ -166,18 +166,22 @@ class BoltOddsUpstreamClient:
         """
         while self._running:
             try:
+                if not self._connected or self._ws is None:
+                    # No usable connection — skip straight to reconnect
+                    raise Exception("No active upstream connection")
+
                 async for raw_message in self._ws:
                     if not self._running:
                         break
 
-                    all_changed_games: list[str] = []
+                    all_changed_games: set[str] = set()
 
                     for msg in parse_boltodds_ws_payload(raw_message):
                         action = msg.get("action")
 
                         if action in ("initial_state", "line_update"):
                             changed = self._store.process_update(msg)
-                            all_changed_games.extend(changed)
+                            all_changed_games.update(changed)
 
                         elif action == "game_removed":
                             self._store.remove_game(msg)
@@ -191,7 +195,7 @@ class BoltOddsUpstreamClient:
                     # Notify downstream subscribers about changes
                     if all_changed_games and self._on_update:
                         try:
-                            await self._on_update(all_changed_games)
+                            await self._on_update(list(all_changed_games))
                         except Exception as e:
                             logger.error(f"Error in on_update callback: {e}")
 

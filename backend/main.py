@@ -114,6 +114,11 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to connect to BoltOdds: {e}")
         logger.info("Server will start anyway - upstream will retry in background")
+        # connect_and_subscribe() failed before start_listening() was reached,
+        # so there is no background task running to retry.  Start the listen
+        # loop manually — it will immediately enter the reconnect branch
+        # because self._ws is not usable.
+        await upstream.start_listening()
 
     yield
 

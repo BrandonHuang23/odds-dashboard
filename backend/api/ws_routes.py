@@ -74,7 +74,7 @@ async def websocket_odds(websocket: WebSocket):
 
             if msg_type == "subscribe":
                 await _handle_subscribe(
-                    client_id, data, manager, store, websocket
+                    client_id, data, manager, store, upstream, websocket
                 )
 
             elif msg_type == "unsubscribe":
@@ -99,6 +99,7 @@ async def _handle_subscribe(
     data: dict,
     manager,
     store,
+    upstream,
     websocket: WebSocket,
 ):
     """
@@ -146,7 +147,7 @@ async def _handle_subscribe(
     # Also send current system status
     await websocket.send_json({
         "type": "status",
-        "upstream_connected": True,
+        "upstream_connected": upstream.connected,
         "games_tracked": store.game_count,
         "sportsbooks_active": len(store.active_sportsbooks),
     })

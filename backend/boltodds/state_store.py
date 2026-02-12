@@ -277,6 +277,7 @@ class StateStore:
                     "outcome_line": outcome.outcome_line,
                     "outcome_over_under": outcome.outcome_over_under,
                     "outcome_target": outcome.outcome_target,
+                    "previous_odds": outcome.previous_odds,
                     "timestamp": outcome.timestamp,
                 }
             if filtered_outcomes:
