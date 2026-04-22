@@ -18,12 +18,6 @@ cd backend
 pip install -r requirements.txt
 ```
 
-Create a `.env` file in `backend/` with your API key:
-
-```
-BOLTODDS_API_KEY=<your-key>
-```
-
 Start the server:
 
 ```bash
